@@ -7,6 +7,46 @@ import History from "./components/History";
 function App() {
   const [generatedData, setGeneratedData] = useState(null);
   const [showHistory, setShowHistory] = useState(true);
+  const [historyRefreshTrigger, setHistoryRefreshTrigger] = useState(0);
+
+  const handleReloadFromHistory = async (historyItem) => {
+    // Trigger generation with the topic from history
+    // The InputForm will receive this and populate its form
+    setGeneratedData({
+      topic: historyItem.topic,
+      level: historyItem.level,
+      isReloading: true,
+      message: "Loading from history..."
+    });
+
+    // Import generateContent directly for the reload
+    const { generateContent } = await import("./api");
+    
+    try {
+      const payload = {
+        topic: historyItem.topic,
+        level: historyItem.level,
+        style: "educational",
+        image_prompt: historyItem.topic,
+        image_count: 5
+      };
+      
+      const result = await generateContent(payload);
+      setGeneratedData(result);
+      setHistoryRefreshTrigger(prev => prev + 1);
+    } catch (err) {
+      console.error("Error reloading from history:", err);
+      setGeneratedData({
+        error: "Failed to reload content",
+        topic: historyItem.topic
+      });
+    }
+  };
+
+  const handleDataGenerated = (newData) => {
+    setGeneratedData(newData);
+    setHistoryRefreshTrigger(prev => prev + 1);
+  };
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
@@ -31,7 +71,7 @@ function App() {
           
           {/* Left: Input */}
           <div className="w-1/4 min-h-0">
-            <InputForm setData={setGeneratedData} />
+            <InputForm setData={handleDataGenerated} prefilledTopic={generatedData?.topic} />
           </div>
 
           {/* Middle: Text Output */}
@@ -47,7 +87,7 @@ function App() {
           {/* Far Right: History (Conditional) */}
           {showHistory && (
             <div className="w-1/4 min-h-0">
-              <History />
+              <History onReloadItem={handleReloadFromHistory} refreshTrigger={historyRefreshTrigger} />
             </div>
           )}
 

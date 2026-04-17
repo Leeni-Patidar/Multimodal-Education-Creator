@@ -1,25 +1,33 @@
 import { useState, useEffect } from "react";
 import { getHistory, searchHistory } from "../api";
 
-export default function History() {
+export default function History({ onReloadItem, refreshTrigger }) {
   const [history, setHistory] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLevel, setSelectedLevel] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
+  const [reloadingId, setReloadingId] = useState(null);
 
-  // Load history on component mount
+  // 🔹 Helper: Sort latest first
+  const sortByLatest = (data) => {
+    return (data || []).sort(
+      (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+    );
+  };
+
+  // Load history on component mount and when refreshTrigger changes
   useEffect(() => {
     loadHistory();
-  }, []);
+  }, [refreshTrigger]);
 
   const loadHistory = async () => {
     setLoading(true);
     setError("");
     try {
       const data = await getHistory(15);
-      setHistory(data.history || []);
+      setHistory(sortByLatest(data.history));
       setHasSearched(false);
     } catch (err) {
       console.error("Error loading history:", err);
@@ -31,7 +39,7 @@ export default function History() {
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    
+
     if (!searchQuery.trim()) {
       loadHistory();
       return;
@@ -48,7 +56,7 @@ export default function History() {
         selectedLevel,
         15
       );
-      setHistory(data.history || []);
+      setHistory(sortByLatest(data.history));
     } catch (err) {
       console.error("Error searching history:", err);
       setError("Failed to search history");
@@ -64,50 +72,32 @@ export default function History() {
     loadHistory();
   };
 
+  const handleReloadItem = async (item) => {
+    if (!onReloadItem) return;
+    
+    setReloadingId(item.id);
+    try {
+      await onReloadItem({
+        topic: item.topic,
+        level: item.level,
+        content_preview: item.content_preview
+      });
+    } catch (err) {
+      console.error("Error reloading item:", err);
+      setError("Failed to reload item");
+    } finally {
+      setReloadingId(null);
+    }
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-md overflow-hidden flex flex-col h-full">
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-6 py-4 border-b-4 border-purple-800">
         <h3 className="text-white font-bold text-lg">📋 Generation History</h3>
-        <p className="text-purple-100 text-sm mt-1">Search your past generations</p>
+        
       </div>
 
-      {/* Search Section */}
-      <div className="p-4 bg-purple-50 border-b border-purple-200">
-        <form onSubmit={handleSearch} className="space-y-3">
-          {/* Search Input */}
-          <div>
-            <input
-              type="text"
-              placeholder="Search by topic..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-            />
-          </div>
-
-
-          {/* Buttons */}
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white font-semibold py-2 rounded-lg transition text-sm"
-            >
-              {loading ? "Searching..." : "Search"}
-            </button>
-            {hasSearched && (
-              <button
-                type="button"
-                onClick={handleClearSearch}
-                className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 rounded-lg transition text-sm"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-        </form>
-      </div>
 
       {/* Error Message */}
       {error && (
@@ -131,11 +121,9 @@ export default function History() {
             <div
               key={item.id || idx}
               className="p-3 bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-purple-500 rounded-lg hover:shadow-md transition cursor-pointer"
+              onClick={() => handleReloadItem(item)}
             >
-              {/* Title */}
-
-
-              {/* Topic/Query */}
+              {/* Topic */}
               {item.topic && (
                 <div className="text-xs text-gray-600 mb-2 truncate">
                   <strong>Topic:</strong> {item.topic}
@@ -143,10 +131,12 @@ export default function History() {
               )}
 
 
+
               {/* Timestamp */}
               {item.timestamp && (
                 <div className="text-xs text-gray-500 italic">
-                  {new Date(item.timestamp).toLocaleDateString()} {new Date(item.timestamp).toLocaleTimeString()}
+                  {new Date(item.timestamp).toLocaleDateString()}{" "}
+                  {new Date(item.timestamp).toLocaleTimeString()}
                 </div>
               )}
 
@@ -154,6 +144,13 @@ export default function History() {
               {item.content_preview && (
                 <div className="mt-2 text-xs text-gray-600 italic line-clamp-2 bg-white bg-opacity-50 p-2 rounded">
                   "{item.content_preview}"
+                </div>
+              )}
+
+              {/* Reload Indicator */}
+              {reloadingId === item.id && (
+                <div className="mt-2 text-xs text-center text-purple-600 font-semibold">
+                  ⟳ Reloading...
                 </div>
               )}
             </div>

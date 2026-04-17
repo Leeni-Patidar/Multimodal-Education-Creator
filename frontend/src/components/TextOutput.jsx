@@ -52,11 +52,19 @@ export default function TextOutput({ data }) {
               </h4>
 
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 flex-1 overflow-y-auto min-h-0">
-                <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap break-words">
-                  {parseMarkdownBold(
-                    data.explanation || "No text explanation available"
-                  )}
-                </div>
+                {data.explanation ? (
+                  <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap break-words">
+                    {parseMarkdownBold(data.explanation)}
+                  </div>
+                ) : (
+                  <div className="text-gray-500 text-sm italic">
+                    {data.error ? (
+                      <p className="text-red-600">{data.error}</p>
+                    ) : (
+                      <p>No text explanation available</p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

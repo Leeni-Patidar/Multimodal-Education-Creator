@@ -1,14 +1,22 @@
 import { useState } from "react";
+import React from "react";
 import { generateContent } from "../api";
 
-export default function InputForm({ setData }) {
-  const [concept, setConcept] = useState("");
+export default function InputForm({ setData, prefilledTopic }) {
+  const [concept, setConcept] = useState(prefilledTopic || "");
   const [outputType, setOutputType] = useState("Flashcard");
   const [imagePrompt, setImagePrompt] = useState("");
   const [imageStyle, setImageStyle] = useState("Photo-realistic");
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [loading, setLoading] = useState(false);
   const [activeButton, setActiveButton] = useState(""); // 🔥 NEW
+
+  // Update concept when prefilledTopic changes (when reloading from history)
+  React.useEffect(() => {
+    if (prefilledTopic) {
+      setConcept(prefilledTopic);
+    }
+  }, [prefilledTopic]);
 
   const submitRequest = async (type) => {
     const topic = concept.trim();
@@ -71,7 +79,7 @@ export default function InputForm({ setData }) {
         </h3>
       </div>
 
-      <div className="p-6 space-y-6">
+      <div className="p-6 space-y-10">
         {/* Concept */}
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -82,7 +90,7 @@ export default function InputForm({ setData }) {
             value={concept}
             onChange={(e) => setConcept(e.target.value)}
             placeholder="Enter a topic (e.g., Photosynthesis or Newton's Laws)"
-            className="w-full h-20 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            className="w-full h-50 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
         </div>
 
@@ -104,39 +112,9 @@ export default function InputForm({ setData }) {
             : "Generate Narrative"}
         </button>
 
-        <div className="border-t-2 border-gray-200"></div>
+       
 
-        {/* Image Prompt */}
-        <div>
-          <h4 className="font-semibold text-gray-700 mb-3 text-sm">
-            Refine Image Prompt
-          </h4>
 
-          <textarea
-            value={imagePrompt}
-            onChange={(e) => setImagePrompt(e.target.value)}
-            placeholder="Describe visual scene..."
-            className="w-full h-20 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
-          />
-
-          {/* Visual Button */}
-          <button
-            onClick={handleGenerateVisuals}
-            disabled={loading || (!concept.trim() && !imagePrompt.trim())}
-            className={`w-full py-2 rounded-lg font-medium mt-3 transition text-white
-              ${
-                activeButton === "visuals"
-                  ? "bg-purple-600"
-                  : "bg-blue-500 hover:bg-blue-600"
-              }
-              ${loading ? "opacity-70 cursor-not-allowed" : ""}
-            `}
-          >
-            {loading && activeButton === "visuals"
-              ? "Generating..."
-              : "Generate Visuals"}
-          </button>
-        </div>
       </div>
     </div>
   );
