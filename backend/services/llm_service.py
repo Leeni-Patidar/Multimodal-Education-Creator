@@ -9,6 +9,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+RAG_ENABLED = os.getenv("RAG_ENABLED", "true").lower() == "true"
 
 # Create session with connection pooling and retries
 _session = None
@@ -27,7 +28,17 @@ def get_session():
         _session.mount("https://", adapter)
     return _session
 
-def generate_text(prompt):
+def generate_text(prompt: str, context_metadata: dict = None) -> str:
+    """
+    Generate text using Groq LLM API.
+    
+    Args:
+        prompt: The prompt to send to the LLM
+        context_metadata: Optional metadata about RAG context used
+    
+    Returns:
+        Generated text response
+    """
     if not GROQ_API_KEY:
         raise ValueError("GROQ_API_KEY not set in environment variables")
     
@@ -49,7 +60,11 @@ def generate_text(prompt):
     }
 
     try:
-        logger.info(f"Calling Groq API with faster model...")
+        log_msg = "Calling Groq API"
+        if context_metadata and context_metadata.get("rag_enabled"):
+            log_msg += f" with RAG context ({context_metadata.get('retrieved_docs_count', 0)} documents)"
+        logger.info(log_msg)
+        
         session = get_session()
         response = session.post(url, headers=headers, json=data, timeout=30)
         
