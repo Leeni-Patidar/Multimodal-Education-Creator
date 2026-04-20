@@ -85,8 +85,17 @@ async def generate_content(req: GenerateRequest):
         text_output, image_bytes_list = await asyncio.gather(
             loop.run_in_executor(executor, generate_text, text_prompt, text_metadata),
             loop.run_in_executor(executor, generate_images, image_prompt_enhanced, req.image_count),
-            return_exceptions=False
+            return_exceptions=True
         )
+        
+        # Handle exceptions from gather
+        if isinstance(text_output, Exception):
+            logger.error(f"Text generation error: {str(text_output)}")
+            text_output = f"Error generating text: {str(text_output)}"
+        
+        if isinstance(image_bytes_list, Exception):
+            logger.error(f"Image generation error: {str(image_bytes_list)}")
+            image_bytes_list = []
 
         images_base64 = [
             base64.b64encode(image_bytes).decode("utf-8")
@@ -196,16 +205,13 @@ async def get_history(limit: int = 10):
         
         logger.info(f"Retrieving history (limit: {limit})")
         
-        # Get all documents and filter for "Generated" category
-        retriever = DocumentRetriever(top_k=limit * 3)
-        
-        # Retrieve with a generic query to get all
         db = get_vector_db()
         collection = db.collection
         
-        # Get all documents by querying with empty/generic text
+        # Fetch more items than needed to filter and sort properly
+        fetch_limit = limit * 5
         results = collection.get(
-            limit=limit,
+            limit=fetch_limit,
             include=["documents", "metadatas"]
         )
         
@@ -223,11 +229,26 @@ async def get_history(limit: int = 10):
                         "content_preview": results["documents"][i][:200] if results.get("documents") else ""
                     })
         
-        logger.info(f"Retrieved {len(history_items)} history items")
+        # Sort by timestamp (most recent first)
+        history_items.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        
+        # Deduplicate by topic - keep only the most recent occurrence of each topic
+        seen_topics = set()
+        deduplicated_items = []
+        for item in history_items:
+            topic = item.get("topic", "").lower().strip()
+            if topic and topic not in seen_topics:
+                seen_topics.add(topic)
+                deduplicated_items.append(item)
+        
+        # Return only the requested limit
+        deduplicated_items = deduplicated_items[:limit]
+        
+        logger.info(f"Retrieved {len(deduplicated_items)} unique history items (deduped from {len(history_items)})")
         return {
             "status": "success",
-            "history": history_items[:limit],
-            "total_count": len(history_items)
+            "history": deduplicated_items,
+            "total_count": len(deduplicated_items)
         }
         
     except Exception as e:

@@ -3,7 +3,6 @@ import logging
 import os
 import textwrap
 from typing import List
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
@@ -14,9 +13,6 @@ logger = logging.getLogger(__name__)
 
 HF_API_KEY = os.getenv("HF_API_KEY")
 HF_IMAGE_MODEL = os.getenv("HF_IMAGE_MODEL", "black-forest-labs/FLUX.1-schnell")
-
-# Connection pool for concurrent requests
-_executor = ThreadPoolExecutor(max_workers=5)
 
 VARIANT_THEMES = [
     {
@@ -102,59 +98,28 @@ def _generate_image_with_hf(prompt: str) -> bytes | None:
     return None
 
 
-def _generate_single_image(prompt: str, index: int) -> bytes:
-    """Generate a single image with fallback to placeholder."""
-    variant_prompt = f"{prompt}. Variation {index + 1}."
-    image_bytes = _generate_image_with_hf(variant_prompt)
-    if image_bytes:
-        return image_bytes
-    
-    if not HF_API_KEY and index == 0:
-        logger.warning("HF_API_KEY not set, using local placeholder images")
-    return generate_placeholder_image(prompt, index)
-
-
 def generate_images(prompt: str, count: int = 5) -> List[bytes]:
-    """Generate multiple images concurrently for better performance."""
-    total = max(5, count)
-    images: List[bytes] = []
+    """
+    Generate multiple images in order with fallback to placeholder.
     
-    # Use ThreadPoolExecutor for concurrent image generation
-    futures = [
-        _executor.submit(_generate_single_image, prompt, index)
-        for index in range(total)
-    ]
-    
-    # Collect results preserving order
-    for future in as_completed(futures):
-        try:
-            images.append(future.result())
-        except Exception as e:
-            logger.error(f"Failed to generate image: {str(e)}")
-            # Add placeholder on error
-            images.append(generate_placeholder_image(prompt, len(images)))
-    
-    return images[:total]  # Ensure we return exactly 'total' images
-
-
-def generate_image(prompt: str) -> bytes:
-    """Backward-compatible single-image wrapper."""
-    return generate_images(prompt, count=1)[0]
-
-
-def generate_images(prompt: str, count: int = 5) -> List[bytes]:
-    """Generate multiple images and always return at least 5 results."""
+    Preserves image order by processing sequentially instead of using
+    as_completed(), ensuring images appear in the correct positions.
+    """
     total = max(5, count)
     images: List[bytes] = []
 
     for index in range(total):
         variant_prompt = f"{prompt}. Variation {index + 1}."
-        image_bytes = _generate_image_with_hf(variant_prompt)
-        if image_bytes:
-            images.append(image_bytes)
-        else:
-            if not HF_API_KEY and index == 0:
-                logger.warning("HF_API_KEY not set, using local placeholder images")
+        try:
+            image_bytes = _generate_image_with_hf(variant_prompt)
+            if image_bytes:
+                images.append(image_bytes)
+            else:
+                if not HF_API_KEY and index == 0:
+                    logger.warning("HF_API_KEY not set, using local placeholder images")
+                images.append(generate_placeholder_image(prompt, index))
+        except Exception as e:
+            logger.error(f"Failed to generate image at index {index}: {str(e)}")
             images.append(generate_placeholder_image(prompt, index))
 
     return images
