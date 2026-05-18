@@ -25,7 +25,6 @@ An intelligent AI-powered platform that generates personalized educational conte
 ### Frontend
 - **Framework**: React 19 with Vite
 - **Styling**: Tailwind CSS with PostCSS
-- **HTTP Client**: Axios
 - **UI Components**: Custom React components for form, output, history, and flashcards
 
 
@@ -116,7 +115,6 @@ npm run preview  # Preview production build
 ### Backend
 ```bash
 uvicorn main:app --reload    # Start with auto-reload
-python ingest_data.py         # Ingest documents for RAG
 ```
 
 ## 🔧 Environment Variables
